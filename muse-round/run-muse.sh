@@ -15,8 +15,13 @@ prompt="${2:?usage: run-muse.sh <repo-root> <prompt-file>}"
 model="${MUSE_MODEL:-muse-spark-1.3-contributor}"
 effort="${MUSE_EFFORT:-max}"
 
-if ! command -v muse >/dev/null 2>&1; then
-  echo "run-muse: FAIL: muse not found on PATH" >&2
+# On Windows, Muse installs as muse.cmd, which Git Bash only finds by its full name.
+if command -v muse >/dev/null 2>&1; then
+  muse=muse
+elif command -v muse.cmd >/dev/null 2>&1; then
+  muse=muse.cmd
+else
+  echo "run-muse: FAIL: muse not found on PATH (looked for muse and muse.cmd)" >&2
   exit 1
 fi
 if [ ! -d "$repo" ]; then
@@ -37,4 +42,4 @@ if [ "${MUSE_DISABLE_SANDBOX:-0}" = "1" ]; then
 fi
 
 echo "run-muse: $(date -Is) repo=$repo prompt=$prompt model=$model effort=$effort" >&2
-exec muse "${args[@]}"
+exec "$muse" "${args[@]}"

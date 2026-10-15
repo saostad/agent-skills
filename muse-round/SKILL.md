@@ -13,6 +13,15 @@ precise**: point at exact files and lines so Muse reads only what it needs.
 `SKILL_DIR` below means the folder this file is in (for example
 `~/.claude/skills/muse-round`). Use its real path when running the scripts.
 
+**On Windows:** run the bash snippets and `run-muse.sh` in Git Bash (Claude Code's Bash
+tool). The one command that differs is the Muse idle check (see below).
+
+**Is Muse running?** (the bracket in `[m]use` keeps the check from matching itself)
+- macOS / Linux: `ps -eo args | grep -E '[m]use[^ ]* exec '`. Don't use `pgrep -f`, which
+  matches its own shell.
+- Windows (PowerShell):
+  `Get-CimInstance Win32_Process | Where-Object CommandLine -match '[m]use[^ ]* exec ' | Select-Object ProcessId, CommandLine`
+
 ## 0. Project override
 
 If the repo has its own `.claude/skills/muse-round/SKILL.md` (not this file), read it and
@@ -50,9 +59,9 @@ follow it instead. It knows that project's scripts and rules. Stop reading this 
    - No secrets in code, logs, task files or results.
    - **Beginner-friendly UI.** Every input is explained, linked or auto-filled.
    - Plus the project's own rules from step 1.5.
-3. **Make sure Muse is idle:** `ps -eo args | grep -E '[m]use[^ ]* exec '`. Don't use
-   `pgrep -f`, which matches its own shell. Only one Muse runs in a repo at a time. If one
-   is running, write the next task file now and launch it when the notification arrives.
+3. **Make sure Muse is idle** with the "Is Muse running?" check at the top. Only one Muse
+   runs in a repo at a time. If one is running, write the next task file now and launch it
+   when the notification arrives.
 4. **Big requests** ("redesign everything"): split them into rounds of 1–4 items. Do the
    shared foundation first, then one page or area per round. Tell the owner the plan in a
    few lines.
@@ -120,7 +129,7 @@ SKILL_DIR/run-muse.sh "$(git rev-parse --show-toplevel)" .agents/handoff/<task><
 - the status line
 - `git log --oneline <base>..HEAD`
 - `git status -s`
-- `ps -eo args | grep -E '[m]use[^ ]* exec '`
+- the "Is Muse running?" check at the top
 - the log tail, for errors or retries
 
 Answer with what's committed and what's still in progress.
@@ -144,7 +153,8 @@ Answer with what's committed and what's still in progress.
 5. **For visible output (UI, images, generated files), look at a real example.** Tests
    can pass while the output is visibly wrong.
    - UI: `node SKILL_DIR/shot.mjs <url> <out.png> <width> <height> [cookie=value]`
-     takes a full-page screenshot with headless Chromium. Then Read the PNG. Check a desktop
+     takes a full-page screenshot with headless Chromium (it finds Chrome or Edge on
+     Windows and macOS by itself; set `CHROMIUM` to use another). Then Read the PNG. Check a desktop
      width (1400) and a phone width (390), in both themes if the app has them.
    - Sideways scroll and similar checks:
      `node SKILL_DIR/shot.mjs <url> - 390 900 "" '<js expression>'` prints the expression's

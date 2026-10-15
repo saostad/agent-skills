@@ -3,33 +3,65 @@
 //   node shot.mjs <url> <out.png|-> <width> <height> [cookie=value] [js-expression]
 //
 // Pass "-" as out together with a js-expression to print its value instead of a PNG.
-// An empty cookie argument ("") sets no cookie. Needs Node 22+ and chromium on PATH
-// (or CHROMIUM=/path/to/chrome).
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// An empty cookie argument ("") sets no cookie. Needs Node 22+ and a Chromium-based browser:
+// CHROMIUM=/path/to/chrome if set, else Chrome or Edge in its usual install folder on Windows
+// and macOS, else chromium on PATH.
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const isWindows = process.platform === "win32";
+
+function findBrowser() {
+  if (process.env.CHROMIUM) return process.env.CHROMIUM;
+  const env = process.env;
+  const candidates = isWindows
+    ? [env.ProgramFiles, env["ProgramFiles(x86)"], env.LOCALAPPDATA]
+        .filter(Boolean)
+        .flatMap((root) => [
+          join(root, "Google", "Chrome", "Application", "chrome.exe"),
+          join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+          join(root, "Chromium", "Application", "chrome.exe"),
+        ])
+    : process.platform === "darwin"
+      ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+         "/Applications/Chromium.app/Contents/MacOS/Chromium",
+         "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
+      : [];
+  return candidates.find((p) => existsSync(p)) ?? "chromium";
+}
 
 const [url, out, w, h, cookie = "", expr = ""] = process.argv.slice(2);
 if (!url || !out || !w || !h) {
   console.error("usage: node shot.mjs <url> <out.png|-> <width> <height> [cookie=value] [js-expression]");
   process.exit(2);
 }
-const bin = process.env.CHROMIUM ?? "chromium";
+const bin = findBrowser();
 const port = 9300 + Math.floor(Math.random() * 600);
 const profile = mkdtempSync(join(tmpdir(), "shot-"));
 const chrome = spawn(bin, ["--headless=new", "--disable-gpu", "--no-sandbox",
   `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
-  `--window-size=${w},${h}`, "about:blank"], { stdio: "ignore", detached: true });
-chrome.on("error", (e) => { console.error(`shot: FAIL: cannot start ${bin}: ${e.message}`); process.exit(1); });
+  `--window-size=${w},${h}`, "about:blank"], { stdio: "ignore", detached: !isWindows });
+chrome.on("error", (e) => {
+  console.error(`shot: FAIL: cannot start ${bin}: ${e.message}`);
+  rmSync(profile, { recursive: true, force: true });
+  process.exit(1);
+});
 
 // Wait for Chromium to exit before deleting its profile; it writes until then.
 const cleanup = async () => {
   if (chrome.exitCode === null) {
     const exited = new Promise((r) => chrome.once("exit", r));
-    // Kill the whole process group: Chromium helpers outlive the main process.
-    try { process.kill(-chrome.pid, "SIGTERM"); } catch { chrome.kill(); }
+    // Kill the whole process tree: Chromium helpers outlive the main process.
+    // taskkill reports helpers that exit on their own mid-walk as failures, so judge
+    // success by whether Chromium itself exited.
+    if (isWindows) spawnSync("taskkill", ["/pid", String(chrome.pid), "/T", "/F"]);
+    else try { process.kill(-chrome.pid, "SIGTERM"); } catch { chrome.kill(); }
     await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
+    if (chrome.exitCode === null && chrome.signalCode === null) {
+      console.error(`shot: warning: Chromium (pid ${chrome.pid}) is still running after 5s`);
+    }
   }
   try {
     rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

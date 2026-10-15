@@ -12,7 +12,9 @@ any scripts it uses. They work with Claude Code, and with other agents that read
 
 ## Install
 
-Clone once, then link each skill into your agent's skills folder:
+Clone once, then link each skill into your agent's skills folder.
+
+### macOS / Linux
 
 ```bash
 git clone https://github.com/saostad/agent-skills ~/agent-skills
@@ -26,6 +28,25 @@ mkdir -p ~/.codex/skills
 ln -s ~/agent-skills/muse-round ~/.codex/skills/muse-round
 ```
 
+### Windows (PowerShell)
+
+A directory junction plays the role of `ln -s` and needs no admin rights or Developer Mode.
+
+```powershell
+git clone https://github.com/saostad/agent-skills "$HOME\agent-skills"
+
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
+New-Item -ItemType Junction -Path "$HOME\.claude\skills\muse-round" -Target "$HOME\agent-skills\muse-round"
+
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.codex\skills" | Out-Null
+New-Item -ItemType Junction -Path "$HOME\.codex\skills\muse-round" -Target "$HOME\agent-skills\muse-round"
+```
+
+Don't use `ln -s` in Git Bash: without Developer Mode it silently copies the folder, so
+`git pull` won't update the installed skill.
+
 Update with `git -C ~/agent-skills pull`. Start a new agent session to pick up new skills.
 
 For an agent without skill support, ask it to read
@@ -35,8 +56,10 @@ For an agent without skill support, ask it to read
 
 - Muse Code CLI on `PATH`, signed in (`muse exec` must work)
 - git: the skill only runs inside a git repo
-- For UI screenshots (`shot.mjs`): Node 22+ and Chromium on `PATH`, or set
-  `CHROMIUM=/path/to/chrome`
+- On Windows: Git for Windows, which provides the Git Bash that runs `run-muse.sh`
+- For UI screenshots (`shot.mjs`): Node 22+ and a Chromium-based browser. On Windows and
+  macOS it finds Chrome or Edge in their usual install folders; on Linux it needs
+  `chromium` on `PATH`. Set `CHROMIUM=/path/to/chrome` to use a different one.
 
 ## Use
 
